@@ -17,20 +17,45 @@
 "" Created:  Fri Jul 12 9:18:14 AM CST 2013
 "" Modified: Wed Oct  8 1:47:32 PM CST 2014
 
-"" Option values {{{
-"" =================
-
 set nocompatible
-
-set encoding=utf-8 " Character encoding used in Vim: 'latin1', 'utf-8' 'euc-jp', 'big5', etc.
-set fileencodings+=gbk " Automatically detected character encodings
+filetype off
 
 " With a map leader it's possible to do extra key combinations
 let mapleader='\'
 let maplocalleader='\'
 
+" List of directories used for runtime files and plugins
+set runtimepath+=~/.vim/bundle/Vundle.vim
+
+"" Keep Plugin commands between vundle#begin/end {{{
+"" =================================================
+
+call vundle#begin()
+" Alternatively, pass a path where Vundle should install plugins
+"call vundle#begin('~/some/path/here')
+
+Plugin 'gmarik/Vundle.vim' " Let Vundle manage itself
+Plugin 'altercation/vim-colors-solarized' " Colorscheme
+Plugin 'tpope/vim-fugitive' " Git plugin
+"Plugin 'L9' " Plugin from http://vim-scripts.org/vim/scripts.html
+" Git plugin not hosted on GitHub
+"Plugin 'git://git.wincent.com/command-t.git'
+" git repos on your local machine (i.e. when working on your own plugin)
+"Plugin 'file:///home/gmarik/path/to/plugin'
+" The sparkup vim script is in a subdirectory of this repo called vim.
+" Pass the path to set the runtimepath properly.
+"Plugin 'rstacruz/sparkup', {'rtp': 'vim/'}
+" Avoid a name conflict with L9
+"Plugin 'user/L9', {'name': 'newL9'}
+
+call vundle#end()
+"" }}}
+
 set nopaste " Paste mode, insert typed text literally
 set pastetoggle=<Leader><F10> " Key sequence to toggle paste mode
+
+set encoding=utf-8 " Character encoding used in Vim: 'latin1', 'utf-8' 'euc-jp', 'big5', etc.
+set fileencodings+=gbk " Automatically detected character encodings
 
 if has('gui_running')
     " List of font names to be used in the GUI
@@ -229,7 +254,6 @@ if has('mac') || has('macunix')
 else
     set grepprg=ack-grep\ -k
 endif
-" }}}
 
 if has('mac') || has('macunix')
     nmap <D-j> <M-j>
