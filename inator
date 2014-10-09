@@ -1,0 +1,1522 @@
+#! /usr/bin/env bash
+## inator shell script framework library
+##
+## Copyright (C) 2014  Zheng Chi <chee.z@foxmail.com>
+##
+## This program is free software: you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation, either version 3 of the License, or
+## (at your option) any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this program.  If not, see <http://www.gnu.org/licenses/>.
+##
+## Created at Wed Oct  8 16:37:07 CST 2014
+
+## REQUIRED PROGRAMS {{{
+## =====================
+## - rm
+## - touch
+## - mktemp
+## - cat
+## - logger
+## - sed
+## - date
+## - sendmail (default /usr/sbin/sendmail, can be overridden with __SendmailBin)
+## }}}
+
+## GLOBAL VARIABLES {{{
+## ====================
+## - D: defined by inator
+## - U: used by inator if defined
+##
+## ----------------------------
+## D: inatorRequiredBashVersion
+##
+## U: dieExitCode
+## U: scriptExitCode
+## U: scriptDieExitCode
+##
+## U: scriptFile
+## U: scriptPath
+## U: scriptName
+## U: scriptHost
+## U: scriptLock
+## D: scriptLockFile
+## U: scriptLockDir
+## U: scriptSubCommandLog
+## D: scriptSubCommandLogFile + _L
+## U: scriptSubCommandLogDir
+## U: scriptUseSafePathEnv
+## U: scriptUmask
+##
+## D: msgArray
+## U: msgQuiet
+## U: msgTimestampFormat
+##
+## U: printDebug
+## U: printInfo
+## U: printNotice
+## U: printWarning
+## U: printErr
+## U: printCrit
+## U: printAlert
+## U: printEmerg
+## U: printPrefixTimestamp
+## U: printPrefixSeverity
+## U: printPrefixSource
+## U: printPrefixSeverity7
+## U: printPrefixSeverity6
+## U: printPrefixSeverity5
+## U: printPrefixSeverity4
+## U: printPrefixSeverity3
+## U: printPrefixSeverity2
+## U: printPrefixSeverity1
+## U: printPrefixSeverity0
+## U: printColorSeverity7
+## U: printColorSeverity6
+## U: printColorSeverity5
+## U: printColorSeverity4
+## U: printColorSeverity3
+## U: printColorSeverity2
+## U: printColorSeverity1
+## U: printColorSeverity0
+##
+## U: logDebug
+## U: logInfo
+## U: logNotice
+## U: logWarning
+## U: logErr
+## U: logCrit
+## U: logAlert
+## U: logEmerg
+## U: logPrefixTimestamp
+## U: logPrefixSeverity
+## U: logPrefixSource
+## U: logPrefixSeverity7
+## U: logPrefixSeverity6
+## U: logPrefixSeverity5
+## U: logPrefixSeverity4
+## U: logPrefixSeverity3
+## U: logPrefixSeverity2
+## U: logPrefixSeverity1
+## U: logPrefixSeverity0
+## U: logColorSeverity7
+## U: logColorSeverity6
+## U: logColorSeverity5
+## U: logColorSeverity4
+## U: logColorSeverity3
+## U: logColorSeverity2
+## U: logColorSeverity1
+## U: logColorSeverity0
+## U: logTarget
+## D: logFileHasBeenWrittenTo
+##
+## U: mailDebug
+## U: mailInfo
+## U: mailNotice
+## U: mailWarning
+## U: mailErr
+## U: mailCrit
+## U: mailAlert
+## U: mailEmerg
+## U: mailPrefixTimestamp
+## U: mailPrefixSeverity
+## U: mailPrefixSource
+## U: mailPrefixSeverity7
+## U: mailPrefixSeverity6
+## U: mailPrefixSeverity5
+## U: mailPrefixSeverity4
+## U: mailPrefixSeverity3
+## U: mailPrefixSeverity2
+## U: mailPrefixSeverity1
+## U: mailPrefixSeverity0
+## U: mailColorSeverity7
+## U: mailColorSeverity6
+## U: mailColorSeverity5
+## U: mailColorSeverity4
+## U: mailColorSeverity3
+## U: mailColorSeverity2
+## U: mailColorSeverity1
+## U: mailColorSeverity0
+## U: mailFrom
+## U: mailEnvelopeFrom
+## U: mailRecipient
+## U: mailSubject
+##
+## U: sendmailBin
+## U: sendmailArgs
+##
+## D: trapSignals
+##
+## U: BASH_VERSINFO
+## U: EUID
+## D: PATH
+## U: TERM
+## U: USER
+## }}}
+
+## Define the required minimum bash version for this inator release to function properly
+## =====================================================================================
+export inatorRequiredBashVersion=3.2.0
+
+## Inator control functions
+## ========================
+
+function Boot() { # {{{
+    ## DESCRIPTION:
+    ##   Initializes inator
+    ##
+    ## ARGUMENTS:
+    ##   /
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   - inatorRequiredBashVersion (default: 0.0.0)
+    ##   - scriptUseSafePathEnv (default: 1)
+    ##   - scriptUmask (default: 077)
+    ##   - BASH_VERSINFO
+    ##   - EUID
+    ##   - PATH
+
+    # Check for required bash version
+    IFS='.'
+    set -- ${inatorRequiredBashVersion:-0.0.0}
+    unset IFS
+    local -i requiredBashMajorVersion=${1}
+    local -i requiredBashMinorVersion=${2}
+    local -i requiredBashPatchLevel=${3}
+    set --
+    # Create sets of version component numbers to compare one by one, starting with the major version
+    local -a versionsToCompare=(
+	${BASH_VERSINFO[0]}:${requiredBashMajorVersion}
+	${BASH_VERSINFO[1]}:${requiredBashMinorVersion}
+	${BASH_VERSINFO[2]}:${requiredBashPatchLevel}
+    )
+    # Loop through sets of version component numbers
+    local versionSet
+    for versionSet in "${versionsToCompare[@]}"; do
+	IFS=':'
+	set -- ${versionSet}
+	unset IFS
+	currentVersion=${1}
+	requiredVersion=${2}
+	set --
+	# Check whether current version > required version
+	if [[ ${currentVersion} -gt ${requiredVersion} ]]; then
+	    # Version requirements are completely satisfied, so we finish overall comparison
+	    break
+	    # Check whether current version < required version
+	elif [[ ${currentVersion} -lt ${requiredVersion} ]]; then
+	    # Version requirements are not satisfied at all, so we error out
+	    echo "!!! FATAL: inator requires at least bash version ${inatorRequiredBashVersion}" 1>&2
+	    exit 2
+	    # Check whether current version == required version (this is implicitly true, it's just here for clarity)
+	elif [[ ${currentVersion} -eq ${requiredVersion} ]]; then
+	    # Version requirements are satisfied up to the current version number component, so we compare the next versionSet (if any)
+	    continue
+	fi
+    done
+
+    # Use a safe PATH environment variable by default
+    if [[ ${scriptUseSafePathEnv:-1} -eq 1 ]]; then
+	# Default PATH when running as a non-root user
+	export PATH="/bin:/usr/bin"
+	# Extend PATH if we are running as root
+	if [[ ${EUID} -eq 0 ]]; then
+	    export PATH="/sbin:/usr/sbin:${PATH}"
+	fi
+    fi
+
+    # Use a secure umask by default
+    umask ${scriptUmask:-077}
+
+    # Basic shell settings
+    shopt -s extglob  # Enable extended globbing (required for pattern matching)
+    shopt -s extdebug # Enable extended debugging (required for function stack trace)
+    hash -r           # Reset hashed command paths
+    set +m            # Disable monitor mode (job control)
+
+    return 0
+} # }}}
+
+function Dispatch() { #{{{
+    ## DESCRIPTION:
+    ##   Dispatches the application.
+    ##   Calls the Init() and Main() functions that have to be defined by the user.
+    ##
+    ## ARGUMENTS:
+    ##   *: All arguments of the originally executed script
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   scriptExitCode: can be set to a custom exit code from within the user functions
+
+    # Check for user defined Init() function
+    if ! declare -F Init &>/dev/null; then
+	Die ${dieExitCode:-2} "Function Init() does not exist, unable to dispatch application"
+    fi
+
+    # Check for user defined Main() function
+    if ! declare -F Main &>/dev/null; then
+	Die ${dieExitCode:-2} "Function Main() does not exist, unable to dispatch application"
+    fi
+
+    # Init application function
+    Init "${@}" || Die ${?} "Init() failure"
+
+    # Main application pre-processing (create lockfile and subcommand logfile)
+    Prepare || Die ${dieExitCode:-2} "Prepare() failure"
+
+    # Main application function
+    Main || Die ${?} "Main() failure"
+
+    # Main application post-processing (remove lockfile and subcommand logfile)
+    Cleanup || Die ${dieExitCode:-2} "Cleanup() failure"
+
+    # Exit script with optional user specified exit code
+    exit ${scriptExitCode:-0}
+} # }}}
+
+function Prepare() { # {{{
+    ## DESCRIPTION:
+    ##   Run application main pre-processing tasks
+    ##
+    ## ARGUMENTS:
+    ##   /
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   - scriptSubCommandLog (default: 0)
+    ##   - scriptSubCommandLogFile
+    ##   - scriptLock (default: 0)
+    ##   - scriptLockFile
+
+    # Handle script subcommand logfile
+    if [[ ${scriptSubCommandLog:-0} == 1 ]]; then
+	# Create temporary logfile
+	scriptSubCommandLogFile=$(mktemp -q -t -p "${scriptSubCommandLogDir:-/var/log}" ${scriptName:-${0##*/}}.log.XXXXXX)
+	if [[ -z "${scriptSubCommandLogFile}" ]]; then
+	    Msg alert "Failed to create temporary script subcommand logfile in script logdir '${scriptSubCommandLogDir:-/var/log}'"
+	    return 2
+	else
+	    Msg debug "Successfully created temporary script subcommand logfile '${scriptSubCommandLogFile}'"
+	fi
+    else
+	# If sub command logging is disabled, set logfile to /dev/null to make redirections work nevertheless.
+	scriptSubCommandLogFile="/dev/null"
+    fi
+    export scriptSubCommandLogFile _L=${scriptSubCommandLogFile} # use _L as a shorthand
+    Msg debug "Script subcommand logfile: '${scriptSubCommandLogFile}'"
+
+    # Handle script lockfile
+    if [[ ${scriptLock:-0} == 1 ]]; then
+	scriptLockFile="${scriptLockDir:-/var/lock}/${scriptName:-${0##*/}}.lock"
+	# Check/create lockfile
+	if [[ -e "${scriptLockFile}" ]]; then
+	    Msg alert "Script lockfile '${scriptLockFile}' already exists"
+	    return 2
+	elif ! touch "${scriptLockFile}" >>"${_L}" 2>&1; then
+	    Msg alert "Failed to create script lockfile '${scriptLockFile}'"
+	    return 2
+	else
+	    Msg debug "Successfully created script lockfile '${scriptLockFile}'"
+	fi
+    fi
+
+    return 0
+} # }}}
+
+function Cleanup() { # {{{
+    ## DESCRIPTION:
+    ##   Run application main post-processing tasks
+    ##
+    ## ARGUMENTS:
+    ##   /
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   - scriptSubCommandLog (default: 0)
+    ##   - scriptSubCommandLogFile
+    ##   - scriptLock (default: 0)
+    ##   - scriptLockFile
+
+    # Remove script subcommand logfile
+    if [[ ${scriptSubCommandLog:-0} == 1 && "${scriptSubCommandLogFile}" != /dev/null ]]; then
+	Msg debug "Removing script subcommand logfile '${scriptSubCommandLogFile}'"
+	if ! rm -f "${scriptSubCommandLogFile}" &>/dev/null; then
+	    Msg alert "Failed to remove script subcommand logfile '${scriptSubCommandLogFile}'"
+	    return 2
+	else
+	    Msg debug "Successfully removed script subcommand logfile '${scriptSubCommandLogFile}'"
+	fi
+    fi
+
+    # Remove script lockfile
+    if [[ ${scriptLock:-0} == 1 ]]; then
+	Msg debug "Removing script lockfile '${scriptLockFile}'"
+	if ! rm -f "${scriptLockFile}" &>/dev/null; then
+	    Msg alert "Failed to remove script lockfile '${scriptLockFile}'"
+	    return 2
+	else
+	    Msg debug "Successfully removed script lockfile '${scriptLockFile}'"
+	fi
+    fi
+
+    return 0
+} # }}}
+
+function Die() { # {{{
+    ## DESCRIPTION:
+    ##   Terminate the currently executing script
+    ##
+    ## ARGUMENTS:
+    ##   1: exit code (opt, default: 1)
+    ##   2: message (opt): the message explaining the termination
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   /
+
+    local -i exitCode="${1}"; shift
+    local message="${1}"; shift
+
+    # Check for exit code
+    if [[ -z "${exitCode}" ]]; then
+	let exitCode=1
+    fi
+
+    # Check for error message
+    if [[ -z "${message}" ]]; then
+	message="<called ${FUNCNAME[0]}() without message>"
+    fi
+
+    # Display main error message
+    Msg alert "${message}"
+
+    # Generate stack trace
+    if [[ "${scriptGenerateStackTrace:-1}" -eq 1 ]]; then
+	# Number of functions involved
+	local -i numberOfFunctions=$((${#FUNCNAME[@]} - 1))
+
+	# Skip this number of functions from the bottom of the call stack
+	# 1 == only skip this function itself
+	local -i skipNumberOfFunctions=1
+
+	# Display function call stack (if any functions are involved)
+	if [[ "${numberOfFunctions}" > "${skipNumberOfFunctions}" ]]; then
+	    Msg alert "function call stack (most recent last):"
+
+	    # n: Current function array pointer (initially the last element of the FUNCNAME array)
+	    # p: Current parameter pointer (initially the last element of the BASH_ARGV array)
+	    # bashFileName: Source file of previous function that called the current function
+	    # bashLineNumber: Line in file that called the function
+	    # functionName: Name of called function
+	    local -i n=0 p=0 bashLineNumber=0
+	    local bashFileName= functionName=
+
+	    for ((n = ${#FUNCNAME[@]} - 1, p = ${#BASH_ARGV[@]} - 1; n >= ${skipNumberOfFunctions}; n--)); do
+		bashFileName="${BASH_SOURCE[n + 1]##*/}"
+		bashLineNumber="${BASH_LINENO[n]}"
+		functionName="${FUNCNAME[n]}"
+
+		# Get function arguments (bash3 only)
+		if [[ ${#BASH_ARGC[n]} -gt 0 ]]; then
+		    # argList: List of quoted arguments of current function
+		    # arg: Next argument
+		    local argList= arg=
+		    # a: Current function argument count pointer
+		    local -i a=0
+		    for ((a = 0; a < ${BASH_ARGC[n]}; ++a)); do
+			arg="${BASH_ARGV[p - a]}"
+			argList="${argList:+${argList},}'${arg}'"
+		    done
+		    # Decrement parameter pointer by the count of parameters of the current function
+		    (( p -= ${BASH_ARGC[n]} ))
+		fi
+
+		# Skip main function
+		if [[ ${FUNCNAME[n]} == "Main" ]]; then
+		    continue
+		fi
+
+		## Print function information
+		Msg alert "--> ${functionName}(${argList:+${argList}}) called in '${bashFileName}' on line ${bashLineNumber}"
+	    done
+	fi
+    fi
+
+    # Mention path to script subcommand log if enabled and not empty
+    if [[ ${scriptSubCommandLog:-0} -eq 1 && ${scriptSubCommandLogFile} != /dev/null && -s ${scriptSubCommandLogFile} ]]; then
+	Msg alert "Please check script subcommand log '${scriptSubCommandLogFile}' for details"
+    fi
+
+    Msg alert "Terminating script"
+    exit ${exitCode}
+} # }}}
+
+## Inator message functions
+## ========================
+
+function MsgPrint() { # {{{
+    ## DESCRIPTION:
+    ##   Prints a message.
+    ##   This function is NOT intended to be called by the user!
+    ##
+    ## ARGUMENTS:
+    ##   1: timestamp (req): timestamp of the message
+    ##   2: severity (req): severity of the message
+    ##   3: source (req): source of the message (file, line, function)
+    ##   4: message (req): the message to print
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   - printDebug (default: 0)
+    ##   - printInfo (default: 1)
+    ##   - printNotice (default: 1)
+    ##   - printWarning (default: 1)
+    ##   - printErr (default: 1)
+    ##   - printCrit (default: 1)
+    ##   - printAlert (default: 1)
+    ##   - printEmerg (default: 1)
+    ##   - printPrefixScriptNamePid (default: 1)
+    ##   - printPrefixTimestamp (default: 1)
+    ##   - printPrefixSeverity (default: 1)
+    ##   - printPrefixSource (default: 1)
+    ##   - printPrefixSeverity7 (default: >>> [    DEBUG])
+    ##   - printPrefixSeverity6 (default: >>> [     INFO])
+    ##   - printPrefixSeverity5 (default: >>> [   NOTICE])
+    ##   - printPrefixSeverity4 (default: !!! [  WARNING])
+    ##   - printPrefixSeverity3 (default: !!! [    ERROR])
+    ##   - printPrefixSeverity2 (default: !!! [ CRITICAL])
+    ##   - printPrefixSeverity1 (default: !!! [    ALERT])
+    ##   - printPrefixSeverity0 (default: !!! [EMERGENCY])
+    ##   - printColorSeverity7 (default: 1;34)
+    ##   - printColorSeverity6 (default: 1;36)
+    ##   - printColorSeverity5 (default: 1;32)
+    ##   - printColorSeverity4 (default: 1;33)
+    ##   - printColorSeverity3 (default: 1;31)
+    ##   - printColorSeverity2 (default: 1;37;41)
+    ##   - printColorSeverity1 (default: 1;33;41)
+    ##   - printColorSeverity0 (default: 1;37;45)
+    ##   - TERM (used to determine if we are running inside a terminal supporting colors)
+
+    local timestamp="${1}"; shift
+    local severity="${1}"; shift
+    local source="${1}"; shift
+    local message="${1}"; shift
+
+    # Check whether message is to be printed at all
+    case ${severity} in
+	debug|7)    if [[ ${printDebug:-0}	-ne 1 ]]; then return 0; fi ;;
+	info|6)	    if [[ ${printInfo:-1}	-ne 1 ]]; then return 0; fi ;;
+	notice|5)   if [[ ${printNotice:-1}	-ne 1 ]]; then return 0; fi ;;
+	warning|4)  if [[ ${printWarning:-1}	-ne 1 ]]; then return 0; fi ;;
+	err|3)	    if [[ ${printErr:-1}	-ne 1 ]]; then return 0; fi ;;
+	crit|2)	    if [[ ${printCrit:-1}	-ne 1 ]]; then return 0; fi ;;
+	alert|1)    if [[ ${printAlert:-1}	-ne 1 ]]; then return 0; fi ;;
+	emerg|0)    if [[ ${printEmerg:-1}	-ne 1 ]]; then return 0; fi ;;
+    esac
+
+    # Determine whether we can show colors
+    local -i colorTerm=0
+    case "${TERM}" in
+	rxvt*|screen*|xterm*) let colorTerm=1 ;;
+	*) let colorTerm=0 ;;
+    esac
+
+    # Show colors on stdout/stderr only if on a terminal (not redirected)
+    local -i colorStdout=0 colorStderr=0
+    if [[ -t 1 && ${colorTerm} -eq 1 ]]; then
+	let colorStdout=1
+    fi
+    if [[ -t 2 && ${colorTerm} -eq 1 ]]; then
+	let colorStderr=1
+    fi
+
+    # Mapping severity -> stderr/severityPrefix/color
+    local severityPrefix= color=
+    local -i stderr=0
+    case ${severity} in
+	debug|7)
+	    severityPrefix="${printPrefixSeverity7:->>> [    DEBUG]}"
+	    color="1;34" # Blue on default
+	    let stderr=0
+	    ;;
+	info|6)
+	    severityPrefix="${printPrefixSeverity6:->>> [     INFO]}"
+	    color="1;36" # Cyan on default
+	    let stderr=0
+	    ;;
+	notice|5)
+	    severityPrefix="${printPrefixSeverity5:->>> [   NOTICE]}"
+	    color="1;32" # Green on default
+	    let stderr=0
+	    ;;
+	warning|4)
+	    severityPrefix="${printPrefixSeverity4:-!!! [  WARNING]}"
+	    color="1;33" # Yellow on default
+	    let stderr=1
+	    ;;
+	err|3)
+	    severityPrefix="${printPrefixSeverity3:-!!! [    ERROR]}"
+	    color="1;31" # Red on default
+	    let stderr=1
+	    ;;
+	crit|2)
+	    severityPrefix="${printPrefixSeverity2:-!!! [ CRITICAL]}"
+	    color="1;37;41" # White on red
+	    let stderr=1
+	    ;;
+	alert|1)
+	    severityPrefix="${printPrefixSeverity1:-!!! [    ALERT]}"
+	    color="1;33;41" # Yellow on red
+	    let stderr=1
+	    ;;
+	emerg|0)
+	    severityPrefix="${printPrefixSeverity0:-!!! [EMERGENCY]}"
+	    color="1;37;45" # White on magenta
+	    let stderr=1
+	    ;;
+    esac
+
+    # Final message structure in order (components can be disabled): timestamp severityPrefix source message
+    local messagePrefix
+
+    # 1. Prefix message with source?
+    if [[ -n ${source} ]]; then
+	case ${printPrefixSource:-1} in
+	    1) messagePrefix="${source}: ${messagePrefix}" ;;
+	    *) ;;
+	esac
+    fi
+
+    # 2. Prefix message with severity?
+    case ${printPrefixSeverity:-1} in
+	1) messagePrefix="${severityPrefix} ${messagePrefix}" ;;
+	*) ;;
+    esac
+
+    # 3. Prefix message with timestamp?
+    case ${printPrefixTimestamp:-1} in
+	1) messagePrefix="${timestamp} ${messagePrefix}" ;;
+	*) ;;
+    esac
+
+    # 4. Prefix message with script name + pid?
+    case ${printPrefixScriptNamePid:-1} in
+	1) messagePrefix="${scriptName:-${0##*/}}[${$}] ${messagePrefix}" ;;
+	*) ;;
+    esac
+
+    # Print message
+    case ${stderr} in
+	0) # Print message to stdout
+	if [[ ${colorStdout} -eq 1 ]]; then
+	    # Print colored message
+	    echo -e "\033[${color}m${messagePrefix}${message}\033[m"
+	else
+	    # Print plain message
+	    echo "${messagePrefix}${message}"
+	fi
+	;;
+	1) # Print message to stderr
+	if [[ ${colorStderr} -eq 1 ]]; then
+	    # Print colored message
+	    echo -e "\033[${color}m${messagePrefix}${message}\033[m" 1>&2
+	else
+	    # Print plain message
+	    echo "${messagePrefix}${message}" 1>&2
+	fi
+	;;
+    esac
+
+    return 0
+} # }}}
+
+function Print() { # {{{
+    ## DESCRIPTION:
+    ##   Prints a message
+    ##
+    ## ARGUMENTS:
+    ##   1: severity (req): severity of the message
+    ##   2: message (req): the message to print
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   msgTimestampFormat
+
+    local severity="${1}"; shift
+    local message="${1}"; shift
+
+    # Get current timestamp
+    local timestamp=$(date "+${msgTimestampFormat:-%Y-%m-%d %H:%M:%S %:z}" 2>/dev/null)
+
+    # Print message
+    MsgPrint "${timestamp}" "${severity}" "" "${message}"
+
+    return 0
+} # }}}
+
+function MsgLog() { # {{{
+    ## DESCRIPTION:
+    ##   Logs a message (or stdin).
+    ##   This function is NOT intended to be called by the user!
+    ##
+    ## ARGUMENTS:
+    ##   1: timestamp (req): timestamp of the message
+    ##   2: severity (req): severity of the message
+    ##   3: source (req): source of the message (file, line, function)
+    ##   4: message (opt): the message to log (else stdin is read and logged)
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   - logDebug (default: 0)
+    ##   - logInfo (default: 1)
+    ##   - logNotice (default: 1)
+    ##   - logWarning (default: 1)
+    ##   - logErr (default: 1)
+    ##   - logCrit (default: 1)
+    ##   - logAlert (default: 1)
+    ##   - logEmerg (default: 1)
+    ##   - logPrefixScriptNamePid (default: 1)
+    ##   - logPrefixTimestamp (default: 1)
+    ##   - logPrefixSeverity (default: 1)
+    ##   - logPrefixSource (default: 1)
+    ##   - logPrefixSeverity7 (default: >>> [    DEBUG])
+    ##   - logPrefixSeverity6 (default: >>> [     INFO])
+    ##   - logPrefixSeverity5 (default: >>> [   NOTICE])
+    ##   - logPrefixSeverity4 (default: !!! [  WARNING])
+    ##   - logPrefixSeverity3 (default: !!! [    ERROR])
+    ##   - logPrefixSeverity2 (default: !!! [ CRITICAL])
+    ##   - logPrefixSeverity1 (default: !!! [    ALERT])
+    ##   - logPrefixSeverity0 (default: !!! [EMERGENCY])
+    ##   - logTarget (fallback: syslog.user)
+    ##   - logFileHasBeenWrittenTo (helper variable)
+    ##   - _L
+
+    local timestamp="${1}"; shift
+    local severity="${1}"; shift
+    local source="${1}"; shift
+    local message="${1}"; shift
+
+    # Check whether message is to be logged at all
+    case ${severity} in
+	debug|7)    if [[ ${logDebug:-0}    -ne 1 ]]; then return 0; fi ;;
+	info|6)	    if [[ ${logInfo:-1}	    -ne 1 ]]; then return 0; fi ;;
+	notice|5)   if [[ ${logNotice:-1}   -ne 1 ]]; then return 0; fi ;;
+	warning|4)  if [[ ${logWarning:-1}  -ne 1 ]]; then return 0; fi ;;
+	err|3)	    if [[ ${logErr:-1}	    -ne 1 ]]; then return 0; fi ;;
+	crit|2)	    if [[ ${logCrit:-1}	    -ne 1 ]]; then return 0; fi ;;
+	alert|1)    if [[ ${logAlert:-1}    -ne 1 ]]; then return 0; fi ;;
+	emerg|0)    if [[ ${logEmerg:-1}    -ne 1 ]]; then return 0; fi ;;
+    esac
+
+    # Mapping severity -> severityPrefix
+    local severityPrefix
+    case ${severity} in
+	debug|7)    severityPrefix="${logPrefixSeverity7:->>> [    DEBUG]}" ;;
+	info|6)	    severityPrefix="${logPrefixSeverity6:->>> [     INFO]}" ;;
+	notice|5)   severityPrefix="${logPrefixSeverity5:->>> [   NOTICE]}" ;;
+	warning|4)  severityPrefix="${logPrefixSeverity4:-!!! [  WARNING]}" ;;
+	err|3)	    severityPrefix="${logPrefixSeverity3:-!!! [    ERROR]}" ;;
+	crit|2)	    severityPrefix="${logPrefixSeverity2:-!!! [ CRITICAL]}" ;;
+	alert|1)    severityPrefix="${logPrefixSeverity1:-!!! [    ALERT]}" ;;
+	emerg|0)    severityPrefix="${logPrefixSeverity0:-!!! [EMERGENCY]}" ;;
+    esac
+
+    # Final message structure in order (components can be disabled): timestamp severityPrefix source message
+
+    # We have to use different prefixes for file and syslog targets)
+    local fileTargetMessagePrefix syslogTargetMessagePrefix
+
+    # 1. Prefix message with source? (for file and syslog targets)
+    if [[ -n ${source} ]]; then
+	case ${logPrefixSource:-1} in
+	    1) fileTargetMessagePrefix="${source}: ${fileTargetMessagePrefix}"
+		syslogTargetMessagePrefix="${source}: ${syslogTargetMessagePrefix}" ;;
+	    *) ;;
+	esac
+    fi
+
+    # 2. Prefix message with severity? (for file target only)
+    case ${logPrefixSeverity:-1} in
+	1) fileTargetMessagePrefix="${severityPrefix} ${fileTargetMessagePrefix}" ;;
+	*) ;;
+    esac
+
+    # 3. Prefix message with timestamp? (for file target only)
+    case ${logPrefixTimestamp:-1} in
+	1) fileTargetMessagePrefix="${timestamp} ${fileTargetMessagePrefix}" ;;
+	*) ;;
+    esac
+
+    # 4. Prefix message with script name + pid? (for file target only)
+    case ${logPrefixScriptNamePid:-1} in
+	1) fileTargetMessagePrefix="${scriptName:-${0##*/}}[${$}] ${fileTargetmessagePrefix}" ;;
+	*) ;;
+    esac
+
+    # Loop through list of log targets
+    IFS=','
+    local -a logTargetArray=( ${logTarget:-syslog:user} )
+    unset IFS
+    local -i l=0
+    for ((l = 0; l < ${#logTargetArray[@]}; l++)); do
+	local logTarget=${logTargetArray[l]}
+	case ${logTarget} in
+	    file:*) # Log to a file
+		# Parse log target setting
+		IFS=':'
+		set -- ${logTarget}
+		unset IFS
+		local logFile=${2} # /path/to/logfile
+		local logMode=${3:-overwrite} # overwrite|append, default: overwrite
+		set --
+
+		# Write log message to file, if message is empty, we read stdin
+		if [[ -z ${message} ]]; then
+		    if [[ ${logMode} == 'append' || ${logFileHasBeenWrittenTo} -eq 1 ]]; then
+			# TODO FIXME: check return value?
+			sed -e "s/^/${fileTargetMessagePrefix}/" >>${logFile} 2>>"${_L:-/dev/null}"
+		    else
+			# TODO FIXME: check return value?
+			sed -e "s/^/${fileTargetMessagePrefix}/" >${logFile} 2>>"${_L:-/dev/null}"
+		    fi
+		else
+		    if [[ ${logMode} == 'append' || ${logFileHasBeenWrittenTo} -eq 1 ]]; then
+			# TODO FIXME: check return value?
+			echo "${fileTargetMessagePrefix}${message}" >>${logFile} 2>>"${_L:-/dev/null}"
+		    else
+			# TODO FIXME: check return value?
+			echo "${fileTargetMessagePrefix}${message}" >${logFile} 2>>"${_L:-/dev/null}"
+		    fi
+		fi
+		# Global helper variable to determine if logfile has already been opened / written to before
+		# during the current execution of the script, needed to support "append" mode.
+		declare -i logFileHasBeenWrittenTo=1
+		;;
+	    syslog:*) # Log via syslog
+		# Parse log target setting
+		IFS=':'
+		set -- ${logTarget}
+		unset IFS
+		local syslogFacility=${2:-user}
+		local syslogPri="${syslogFacility}.${severity}"
+		local syslogTag="${scriptName:-${0##*/}}[${$}]" # scriptname[PID]
+		set --
+		# Send log message to syslog
+		if [[ -z ${message} ]]; then
+		    # Log stdin
+		    logger -p "${syslogPri}" -t "${syslogTag}" >>"${_L:-/dev/null}" 2>&1
+		else
+		    # Log passed message
+		    logger -p "${syslogPri}" -t "${syslogTag}" -- "${syslogTargetMessagePrefix}${message}" >>"${_L:-/dev/null}" 2>&1
+		fi
+		;;
+	    *) # any other (invalid) log target
+		return 2
+		;;
+	esac
+    done
+
+    return 0
+} # }}}
+
+function Log() { # {{{
+    ## DESCRIPTION:
+    ##   Logs a message (or stdin).
+    ##
+    ## ARGUMENTS:
+    ##   1: severity (req): severity of the message
+    ##   2: message (opt): the message to log (else stdin is read and logged)
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   msgTimestampFormat
+
+    local severity="${1}"; shift
+    local message="${1}"; shift
+
+    # Get current timestamp
+    local timestamp=$(date "+${msgTimestampFormat:-%Y-%m-%d %H:%M:%S %:z}" 2>/dev/null)
+
+    # Log message
+    MsgLog "${timestamp}" "${severity}" "" "${message}"
+
+    return 0
+} # }}}
+
+function Msg() { # {{{
+    ## DESCRIPTION:
+    ##   Processes a message (or stdin) for logging/printing/later mailing.
+    ##
+    ## ARGUMENTS:
+    ##   0: -q (opt): quiet (do not print message, required for print functions)
+    ##   1: severity (req): severity of the message
+    ##   2: message (opt): the message to log (else stdin is read and logged)
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   msgArray
+    ##   msgQuiet
+    ##   msgTimestampFormat
+
+    local quiet=0
+    if [[ ${1} == "-q" ]]; then
+	let quiet=1; shift
+    fi
+    local severity="${1}"; shift
+    local message="${1}"; shift
+
+    # Get current timestamp
+    local timestamp=$(date "+${msgTimestampFormat:-%Y-%m-%d %H:%M:%S %:z}" 2>/dev/null)
+
+    # Check for global quiet operation setting
+    if [[ ${msgQuiet} -eq 1 ]]; then
+	let quiet=1
+    fi
+
+    # Determine the line number and file name of the current script file and the calling function
+    local callingFunction=
+    local -i bashLineNumber=0
+    local bashFileName=
+    case "${FUNCNAME[1]}" in
+	Die) # We were called by Die()
+	    # Use the info of the function that called Die()
+	    bashFileName=${BASH_SOURCE[2]} # The file name where the function that called Die was called
+	    let bashLineNumber=${BASH_LINENO[1]} # The line number where Die was called
+	    callingFunction=${FUNCNAME[2]} # The name of the function that called Die
+	    ;;
+	*) # we were called by any other function
+	    # Use the info of the function that called Msg()
+	    bashFileName=${BASH_SOURCE[1]} # The file name where the function that called Msg was called
+	    let bashLineNumber=${BASH_LINENO[0]} # The line number where Msg was called
+	    callingFunction=${FUNCNAME[1]} # The name of the function that called Msg
+	    ;;
+    esac
+    bashFileName=${bashFileName##*/} # Strip leading path
+
+    # Build message source string based on calling function
+    local source=
+    case "${callingFunction}" in
+	Main) # Main execution/no function
+	    source="{${bashFileName}:${bashLineNumber}}"
+	    ;;
+	#Die) # Die function
+	#   source="{${bashFileName}:${bashLineNumber}}, ${callingFunction}()"
+	#   ;;
+	*) # We were called by any other function
+	    # Use the calling function as message prefix
+	    source="{${bashFileName}:${bashLineNumber}}, ${callingFunction}()"
+	    ;;
+    esac
+
+    # Populate local messsage array
+    local -a messageArray=()
+    if [[ -z ${message} ]]; then
+	# No message argument given, so read stdin and append every line to the message array while read; do
+	messageArray+=( "${REPLY}" )
+	done
+    else
+	# Single message argument
+	messageArray=( "${message}" )
+    fi
+
+    # Loop through local message array and process messages:
+    # - add message to global message array
+    # - print message
+    # - log message
+    local -i m=0
+    for ((m = 0; m < ${#messageArray[@]}; m++)); do
+	# Current message
+	local currentMessage=${messageArray[m]}
+
+	# Append current message to the global message array
+	msgArray+=( "${timestamp}|${severity}|${source}|${currentMessage}" )
+
+	# Only print current message if quiet operation isn't enabled
+	if [[ ${quiet} -ne 1 ]]; then
+	    MsgPrint "${timestamp}" "${severity}" "${source}" "${currentMessage}"
+	fi
+
+	# Log current message
+	MsgLog "${timestamp}" "${severity}" "${source}" "${currentMessage}"
+    done
+
+    return 0
+} # }}}
+
+function MsgMail() { # {{{
+    ## DESCRIPTION:
+    ##   Sends all saved messages (and script subcommand log, if enabled) via mail
+    ##   this function is NOT intended to be called by the user!
+    ##
+    ## ARGUMENTS:
+    ##   /
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   - mailDebug (default: 0)
+    ##   - mailInfo (default: 1)
+    ##   - mailNotice (default: 1)
+    ##   - mailWarning (default: 1)
+    ##   - mailErr (default: 1)
+    ##   - mailCrit (default: 1)
+    ##   - mailAlert (default: 1)
+    ##   - mailEmerg (default: 1)
+    ##   - mailPrefixScriptNamePid (default: 0)
+    ##   - mailPrefixTimestamp (default: 1)
+    ##   - mailPrefixSeverity (default: 1)
+    ##   - mailPrefixSource (default: 1)
+    ##   - mailPrefixSeverity7 (default: [    DEBUG])
+    ##   - mailPrefixSeverity6 (default: [     INFO])
+    ##   - mailPrefixSeverity5 (default: [   NOTICE])
+    ##   - mailPrefixSeverity4 (default: [  WARNING])
+    ##   - mailPrefixSeverity3 (default: [    ERROR])
+    ##   - mailPrefixSeverity2 (default: [ CRITICAL])
+    ##   - mailPrefixSeverity1 (default: [    ALERT])
+    ##   - mailPrefixSeverity0 (default: [EMERGENCY])
+    ##   - mailFrom
+    ##   - mailEnvelopeFrom
+    ##   - mailRecipient
+    ##   - mailSubject
+    ##   - msgArray
+    ##   - scriptFile
+    ##   - scriptHost
+
+    local mailFrom=${mailFrom:-${USER} <${USER}@${scriptHost}>}
+    local mailEnvelopeFrom=${mailEnvelopeFrom:-${USER}@${scriptHost}}
+    local mailRecipient=${mailRecipient:-${USER}@${scriptHost}}
+    local mailSubject=${mailSubject:-Messages from ${scriptFile} running on ${scriptHost}}
+
+    # Check whether the global message array contains any messages at all
+    if [[ ${#msgArray[@]} -eq 0 ]]; then
+	return 0
+    fi
+
+    # Initialize mail message array
+    local -a mailMessageArray=()
+
+    # Loop through global message array
+    local -i i=0
+    for ((i = 0; i < ${#msgArray[@]}; i++)); do
+	IFS='|'
+	set -- ${msgArray[i]}
+	unset IFS
+	local timestamp=${1}; shift
+	local severity=${1}; shift
+	local source=${1}; shift
+	local message=${@}
+	set --
+
+	# Check whether message is to be mailed at all
+	case ${severity} in
+	    debug|7)	if [[ ${mailDebug:-0}	-ne 1 ]]; then continue; fi ;;
+	    info|6)	if [[ ${mailInfo:-1}	-ne 1 ]]; then continue; fi ;;
+	    notice|5)	if [[ ${mailNotice:-1}	-ne 1 ]]; then continue; fi ;;
+	    warning|4)	if [[ ${mailWarning:-1} -ne 1 ]]; then continue; fi ;;
+	    err|3)	if [[ ${mailErr:-1}	-ne 1 ]]; then continue; fi ;;
+	    crit|2)	if [[ ${mailCrit:-1}	-ne 1 ]]; then continue; fi ;;
+	    alert|1)	if [[ ${mailAlert:-1}	-ne 1 ]]; then continue; fi ;;
+	    emerg|0)	if [[ ${mailEmerg:-1}	-ne 1 ]]; then continue; fi ;;
+	esac
+
+	# Mapping severity -> severityPrefix
+	local severityPrefix=
+	case ${severity} in
+	    debug|7)	severityPrefix="${mailPrefixSeverity7:-[    DEBUG]}" ;;
+	    info|6)	severityPrefix="${mailPrefixSeverity6:-[     INFO]}" ;;
+	    notice|5)	severityPrefix="${mailPrefixSeverity5:-[   NOTICE]}" ;;
+	    warning|4)	severityPrefix="${mailPrefixSeverity4:-[  WARNING]}" ;;
+	    err|3)	severityPrefix="${mailPrefixSeverity3:-[    ERROR]}" ;;
+	    crit|2)	severityPrefix="${mailPrefixSeverity2:-[ CRITICAL]}" ;;
+	    alert|1)	severityPrefix="${mailPrefixSeverity1:-[    ALERT]}" ;;
+	    emerg|0)	severityPrefix="${mailPrefixSeverity0:-[EMERGENCY]}" ;;
+	esac
+
+	# Final message structure in order (components can be disabled): timestamp severityPrefix source message
+	local messagePrefix=
+
+	# 1. Prefix message with source?
+	if [[ -n ${source} ]]; then
+	    case ${mailPrefixSource:-1} in
+		1) messagePrefix="${source}: ${messagePrefix}" ;;
+		*) ;;
+	    esac
+	fi
+
+	# 2. Prefix message with severity?
+	case ${mailPrefixSeverity:-1} in
+	    1) messagePrefix="${severityPrefix} ${messagePrefix}" ;;
+	    *) ;;
+	esac
+
+	# 3. Prefix message with timestamp?
+	case ${mailPrefixTimestamp:-1} in
+	    1) messagePrefix="${timestamp} ${messagePrefix}" ;;
+	    *) ;;
+	esac
+
+	# 4. Prefix message with script name + pid?
+	case ${mailPrefixScriptNamePid:-1} in
+	    1) messagePrefix="${scriptName:-${0##*/}}[${$}] ${messagePrefix}" ;;
+	    *) ;;
+	esac
+
+	# Push final message into array
+	mailMessageArray+=( "${messagePrefix}${message}" )
+    done
+
+    # Check whether the mail message array contains any messages at all
+    if [[ ${#mailMessageArray[@]} -eq 0 ]]; then
+	return 0
+    fi
+
+    # Send mail
+    {
+	# Print all messages that are to be mailed
+	for ((i = 0; i < ${#mailMessageArray[@]}; i++)); do
+	    echo "${mailMessageArray[i]}"
+	done
+	# Append script subcommand log?
+	if [[ ${mailAppendScriptSubCommandLog:-1} -eq 1 && ${scriptSubCommandLog:-0} -eq 1 && ${scriptSubCommandLogFile} != /dev/null && -s ${scriptSubCommandLogFile} ]]; then
+	    echo
+	    echo "--8<--[ Start of script subcommand log (${scriptSubCommandLogFile}) ]--8<--"
+	    cat "${scriptSubCommandLogFile}" 2>/dev/null
+	    echo "--8<--[ End of script subcommand log ]--8<--"
+	fi
+    } | Mail "${mailFrom}" "${mailEnvelopeFrom}" "${mailRecipient}" "${mailSubject}"
+    local -i returnValue=${?}
+    case ${returnValue} in
+	0)
+	    Msg debug "Successfully sent mail"
+	    ;;
+	2)
+	    Msg err "Failed sending mail"
+	    return 2
+	    ;;
+	*)
+	    Msg err "Undefined return value: ${returnValue}"
+	    return 2
+	    ;;
+    esac
+
+    return 0
+} # }}}
+
+function Mail() { # {{{
+    ## DESCRIPTION:
+    ##   Sends the contents of stdin via mail
+    ##
+    ## ARGUMENTS:
+    ##   1: mailFrom (req): Some User <some.user@example.com>
+    ##   2: mailEnvelopeFrom (req): some.user@example.com
+    ##   3: mailRecipient (req): some.user@example.com
+    ##   4: mailSubject (req): Messages from thisscript
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   - scriptFile
+    ##   - scriptHost
+    ##   - sendmailBin (default: /usr/sbin/sendmail)
+    ##   - sendmailArgs (default: -t)
+
+    local mailFrom=${1}
+    if [[ -z "${mailFrom}" ]]; then
+	Msg err "argument 1 (mailFrom) missing"
+	return 2
+    fi
+    Msg debug "MailFrom: ${mailFrom}"
+
+    local mailEnvelopeFrom=${2}
+    if [[ -z "${mailEnvelopeFrom}" ]]; then
+	Msg err "Argument 2 (mailEnvelopeFrom) missing"
+	return 2
+    fi
+    Msg debug "MailEnvelopeFrom: ${mailEnvelopeFrom}"
+
+    local mailRecipient=${3}
+    if [[ -z "${mailRecipient}" ]]; then
+	Msg err "Argument 3 (mailRecipient) missing"
+	return 2
+    fi
+    Msg debug "MailRecipient: ${mailRecipient}"
+
+    local mailSubject=${4}
+    if [[ -z "${mailSubject}" ]]; then
+	Msg err "Argument 4 (mailSubject) missing"
+	return 2
+    fi
+    Msg debug "MailSubject: ${mailSubject}"
+
+    # Get current timestamp
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null)
+
+    # Read stdin and append every line to the body array
+    local -a mailBodyArray=()
+    while read; do
+	mailBodyArray+=( "${REPLY}" )
+    done
+
+    # Sendmail arguments
+    local sendmailArgs="${sendmailArgs:--t}"
+
+    # Send mail via sendmail
+    {
+	echo "From: ${mailFrom}"
+	echo "To: ${mailRecipient}"
+	echo "Subject: ${mailSubject}"
+	echo
+	local -i i=0
+	for ((i = 0; i < ${#mailBodyArray[@]}; i++)); do
+	    echo "${mailBodyArray[i]}"
+	done
+	echo
+	echo "-- "
+	echo "sent by ${scriptFile} running on ${scriptHost} at ${timestamp}"
+    } | "${sendmailBin:-/usr/sbin/sendmail}" -f "${mailEnvelopeFrom}" ${sendmailArgs} >>"${_L:-/dev/null}" 2>&1
+    local -i sendmailExitCode=${?}
+    case ${sendmailExitCode} in
+	0)
+	    Msg debug "Successfully sent mail via sendmail"
+	    ;;
+	*)
+	    Msg err "Failed sending mail via sendmail (sendmail exit code: ${sendmailExitCode})"
+	    return 1
+	    ;;
+    esac
+
+    return 0
+} # }}}
+
+## Trap functions
+## ==============
+
+function TrapExit() { # {{{
+    ## DESCRIPTION:
+    ##   Trap function for script exits
+    ##
+    ## ARGUMENTS:
+    ##   /
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   /
+
+    # Mail saved messages
+    MsgMail
+    local -i returnValue=${?}
+    case ${returnValue} in
+	0)
+	    Msg -q debug "Successfully mailed saved messages"
+	    ;;
+	2)
+	    Msg -q err "Failed mailing saved messages"
+	    return 2
+	    ;;
+	*)
+	    Msg -q err "Unexpected MsgMail() return value: ${returnValue}"
+	    return 2
+	    ;;
+    esac
+
+    return 0
+} # }}}
+
+function TrapSignals() { # {{{
+    ## DESCRIPTION:
+    ##   Trap function for script signals
+    ##
+    ## ARGUMENTS:
+    ##   1: signal (req): signal that was trapped
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   /
+
+    local signal=${1}
+    if [[ -z "${signal}" ]]; then
+	Msg err "Argument 1 (signal) missing"
+	return 2
+    fi
+    Msg debug "Signal: ${signal}"
+
+    # Check for a user-defined trap function and call it
+    if declare -F Trap${signal} &>/dev/null; then
+	Trap${signal}
+	return ${?}
+    fi
+
+    # Default: generate a message and die on certain signals
+    local -i die=0
+    case ${signal} in
+	SIGHUP) die=1; msg="Received hangup signal" ;;
+	SIGINT) die=1; msg="Received interrupt from keyboard" ;;
+	SIGQUIT) die=1; msg="Received quit from keyboard" ;;
+	SIGABRT) die=1; msg="Received abort signal" ;;
+	SIGPIPE) die=1; msg="Broken pipe" ;;
+	SIGALRM) die=1; msg="Received alarm signal" ;;
+	SIGTERM) die=1; msg="Received termination signal" ;;
+	*) die=0; msg="Trapped signal ${signal}" ;;
+    esac
+    if [[ ${die} -ne 0 ]]; then
+	Msg err "${msg}"
+	exit 2
+    else
+	Msg notice "${msg}"
+    fi
+
+    return 0
+} # }}}
+
+## Enable the TrapExit function for script exits
+## ===============================================
+trap "TrapExit" EXIT
+
+## Trap certain signals using TrapSignals
+## ========================================
+declare -a trapSignals=(
+    SIGHUP  # 1
+    SIGINT  # 2 (^C)
+    SIGQUIT # 3 (^\)
+    SIGABRT # 6
+    SIGPIPE # 13
+    SIGALRM # 14
+    SIGTERM # 15
+)
+for signal in "${trapSignals[@]}"; do
+    trap "TrapSignals ${signal}" "${signal}"
+done
+
+## Misc helper functions
+## =====================
+
+function IncludeSource() { # {{{
+    ## DESCRIPTION:
+    ##   Source a file
+    ##
+    ## ARGUMENTS:
+    ##   1: file (req): the file to include
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   _L
+
+    local file=${1}
+    if [[ -z "${file}" ]]; then
+	Msg err "Argument 1 (file) missing"
+	return 2
+    fi
+
+    if ! source "${file}" >>"${_L:-/dev/null}" 2>&1; then
+	Msg crit "Failed to include source file '${file}'"
+	return 2
+    fi
+
+    return 0
+} # }}}
+
+function RequireSource() { # {{{
+    ## DESCRIPTION:
+    ##   source a file and die on failure
+    ##
+    ## ARGUMENTS:
+    ##   1: file (req): the file to include
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   _L
+
+    local file=${1}
+    if [[ -z "${file}" ]]; then
+	Die ${dieExitCode:-2} "Argument 1 (file) missing"
+    fi
+
+    if ! source "${file}" >>"${_L:-/dev/null}" 2>&1; then
+	Die ${dieExitCode:-2} "Failed to include required source file '${file}'"
+    fi
+
+    return 0
+} # }}}
+
+function RequireCommand() { # {{{
+    ## DESCRIPTION:
+    ##   Check if a required command is found in PATH and die on failure
+    ##
+    ## ARGUMENTS:
+    ##   1: command (req): the program to check for
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   /
+
+    local command=${1}
+    if [[ -z "${command}" ]]; then
+	Msg err "Argument 1 (command) missing"
+	return 2
+    fi
+    Msg debug "Command: ${command}"
+
+    if ! type -P "${command}" &>/dev/null; then
+	Die ${dieExitCode:-2} "Required command '${command}' not found in PATH"
+    fi
+
+    return 0
+} # }}}
+
+function AddPrefix() { # {{{
+    ## DESCRIPTION:
+    ##   Add a prefix to a line of text read from stdin
+    ##
+    ## ARGUMENTS:
+    ##   *: prefix (req): the prefix to add
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   /
+
+    local prefix=${@}
+    if [[ -z "${prefix}" ]]; then
+	Msg -q err "Argument 1 (prefix) missing"
+	return 2
+    fi
+    Msg -q debug "Prefix: ${prefix}"
+
+    prefix=${prefix//\\/\\\\} # escape \
+    prefix=${prefix//:/\\:}   # escape :
+    sed -e "s:^:${prefix}:g"
+} # }}}
+
+function GetOpts() { # {{{
+    ## DESCRIPTION:
+    ##   Get options of like GNU style
+    ##
+    ## ARGUMENTS:
+    ##   1. shortOpts: short options array
+    ##   2. longOpts: long options array
+    ##   3. argument: -- argument array
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   /
+
+    local opt= optArg= i= shortOpts=${1}
+    local -a longOpts=() unusedArgv=()
+
+    shift
+    while [[ ${1} && ${1} != '--' ]]; do
+	longOpts+=( ${1} )
+	shift
+    done
+    shift
+
+    function LongOptMatch() { # {{{
+	local o longMatch=()
+	for o in ${longOpts[@]}; do
+	    if [[ ${o%:} = ${1} ]]; then
+		longMatch=( ${o} )
+		break
+	    fi
+	    [[ ${o%:} = ${1}* ]] && longMatch+=( ${o} )
+	done
+
+	case ${#longMatch[*]} in
+	    1)
+		# Success, override with opt and return arg req (0 == none, 1 == required)
+		opt=${longMatch%:}
+		if [[ ${longMatch} = *: ]]; then
+		    return 1
+		else
+		    return 0
+		fi
+		;;
+	    0)
+		# Fail, no match found
+		return 255
+		;;
+	    *)
+		Msg err "option '--${1}' is ambiguous; possibilities: '${longmatch[@]%:}'"
+		return 254
+		;;
+	esac
+    } # }}}
+
+    while ((${#})); do
+	case ${1} in
+	    --) # Explicit end of options
+		shift ; break
+		;;
+	    -[!-]*) # Short option
+		for ((i = 1; i < ${#1}; i++)); do
+		    opt=${1:i:1}
+
+		    # Option does not exist
+		    if [[ ${shortopts} != *${opt}* ]]; then
+			Msg err "Invalid option -- '-${opt}'"
+			OPTRET=(--)
+			return 1
+		    fi
+
+		    OPTRET+=("-${opt}")
+		    # Option requires optarg
+		    if [[ ${shortopts} = *${opt}:* ]]; then
+			# If we are not at the end of the option chunk, the rest is the optarg
+			if ((i < ${#1} - 1)); then
+			    OPTRET+=("${1:i+1}")
+			    break
+			# If we are at the end, grab the the next positional, if it exists
+			elif (( i == ${#1} - 1 )) && [[ ${2} ]]; then
+			    OPTRET+=("${2}")
+			    shift
+			    break
+			# Parse failure
+			else
+			    Msg err "Option '-${opt}' requires an argument"
+			    OPTRET=(--)
+			    return 1
+			fi
+		    fi
+		done
+		;;
+	    --?*=*|--?*) # Long option
+		IFS='='
+		read -r opt optarg <<< "${1#--}"
+		longoptmatch "${opt}"
+		case ${?} in
+		    0)
+			if [[ ${optarg} ]]; then
+			    Msg err "Option '--${opt}' doesn't allow an argument"
+			    OPTRET=(--)
+			    return 1
+			else
+			    OPTRET+=("--${opt}")
+			fi
+			;;
+		    1)
+			# --longopt=optarg
+			if [[ ${optarg} ]]; then
+			    OPTRET+=("--${opt}" "${optarg}")
+			# --longopt optarg
+			elif [[ ${2} ]]; then
+			    OPTRET+=("--${opt}" "${2}" )
+			    shift
+			else
+			    Msg err "Option '--${opt}' requires an argument"
+			    OPTRET=(--)
+			    return 1
+			fi
+			;;
+		    254)
+			# Ambiguous option -- error was reported for us by longoptmatch()
+			OPTRET=(--)
+			return 1
+			;;
+		    255)
+			# Parse failure
+			Msg err "Unrecognized option '--${opt}'"
+			OPTRET=(--)
+			return 1
+			;;
+		esac
+		;;
+	    *) # Non-option arg encountered, add it as a parameter
+		unused_argv+=("${1}")
+		;;
+	esac
+	shift
+    done
+
+    # Add end-of-opt terminator and any leftover positional parameters
+    OPTRET+=('--' "${unused_argv[@]}" "${@}")
+    unset longoptmatch
+} # }}}
+
+## vim:ft=sh:fdm=marker:fdl=0:nowrap:ts=8:sts=4:sw=4:
+

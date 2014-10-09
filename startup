@@ -1,0 +1,246 @@
+#! /usr/bin/env bash
+## inator shell script framework library
+##
+## Copyright (C) 2014  Zheng Chi <chee.z@foxmail.com>
+##
+## This program is free software: you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation, either version 3 of the License, or
+## (at your option) any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this program.  If not, see <http://www.gnu.org/licenses/>.
+##
+## Created at Wed Oct  8 19:39:28 CST 2014
+
+## Basic variables config {{{
+## ======================
+
+export scriptFile=${0##*/}
+export scriptName=${scriptFile%.sh}
+export scriptPath=${0%/*}; scriptPath=${scriptPath%/}
+export scriptHost=$(hostname -f)
+
+export scriptSubCommandLog=1
+#export scriptSubCommandLogDir='/tmp'
+export scriptLock=1
+#export scriptLockDir='/tmp'
+#export scriptUseSafePathEnv=0
+#export scriptUmask=022
+#export scriptGenerateStackTrace=0
+
+#export msgQuiet=1
+export msgTimestampFormat='[%Y-%m-%d %H:%M:%S %:z]'
+#export msgTimestampFormat='[%Y-%m-%d %H:%M:%S.%N %:z]'
+
+export printDebug=1
+#export printInfo=0
+#export printNotice=0
+#export printWarning=0
+#export printErr=0
+#export printCrit=0
+#export printAlert=0
+#export printEmerg=0
+
+#export printPrefixScriptNamePid=0
+#export printPrefixTimestamp=0
+#export printPrefixSeverity=0
+#export printPrefixSource=0
+
+#export printPrefixSeverity7='>>> [    DEBUG]'
+#export printPrefixSeverity6='>>> [     INFO]'
+#export printPrefixSeverity5='>>> [   NOTICE]'
+#export printPrefixSeverity4='!!! [  WARNING]'
+#export printPrefixSeverity3='!!! [    ERROR]'
+#export printPrefixSeverity2='!!! [ CRITICAL]'
+#export printPrefixSeverity1='!!! [    ALERT]'
+#export printPrefixSeverity0='!!! [EMERGENCY]'
+
+#export printColorSeverity7='1;34'    # LOG_DEBUG:   blue on default
+#export printColorSeverity6='1;36'    # LOG_INFO:    cyan on default
+#export printColorSeverity5='1;32'    # LOG_NOTICE:  green on default
+#export printColorSeverity4='1;33'    # LOG_WARNING: yellow on default
+#export printColorSeverity3='1;31'    # LOG_ERR:     red on default
+#export printColorSeverity2='1;37;41' # LOG_CRIT:    white on red
+#export printColorSeverity1='1;33;41' # LOG_ALERT:   yellow on red
+#export printColorSeverity0='1;37;45' # LOG_EMERG:   white on magenta
+
+export logDebug=1
+#export logInfo=0
+#export logNotice=0
+#export logWarning=0
+#export logErr=0
+#export logCrit=0
+#export logAlert=0
+#export logEmerg=0
+
+#export logPrefixScriptNamePid=0
+#export logPrefixTimestamp=0
+#export logPrefixSeverity=0
+#export logPrefixSource=0
+
+#export logPrefixSeverity7='>>> [    DEBUG]'
+#export logPrefixSeverity6='>>> [     INFO]'
+#export logPrefixSeverity5='>>> [   NOTICE]'
+#export logPrefixSeverity4='!!! [  WARNING]'
+#export logPrefixSeverity3='!!! [    ERROR]'
+#export logPrefixSeverity2='!!! [ CRITICAL]'
+#export logPrefixSeverity1='!!! [    ALERT]'
+#export logPrefixSeverity0='!!! [EMERGENCY]'
+
+#export logTarget='syslog:user'
+#export logTarget='file:/var/log/${scriptName}.log'
+#export logTarget='file:/var/log/${scriptName}.log:append'
+#export logTarget='file:/var/log/${scriptName}.log:overwrite'
+#export logTarget='file:/var/log/${scriptName}.log:append,syslog:user'
+#export logTarget='file:/var/log/${scriptName}.log:overwrite,syslog:user'
+#export logTarget='file:/var/log/${scriptName}.log:append,file:/var/log/${scriptName}-current.log:overwrite'
+#export logTarget='file:/var/log/${scriptName}.$(date +"%Y%m%d-%H%M%S").log'
+
+export mailDebug=1
+#export mailInfo=0
+#export mailNotice=0
+#export mailWarning=0
+#export mailErr=0
+#export mailCrit=0
+#export mailAlert=0
+#export mailEmerg=0
+
+#export mailPrefixScriptNamePid=1
+#export mailPrefixTimestamp=0
+#export mailPrefixSeverity=0
+#export mailPrefixSource=0
+
+#export mailPrefixSeverity7='[    DEBUG]'
+#export mailPrefixSeverity6='[     INFO]'
+#export mailPrefixSeverity5='[   NOTICE]'
+#export mailPrefixSeverity4='[  WARNING]'
+#export mailPrefixSeverity3='[    ERROR]'
+#export mailPrefixSeverity2='[ CRITICAL]'
+#export mailPrefixSeverity1='[    ALERT]'
+#export mailPrefixSeverity0='[EMERGENCY]'
+#export mailAppendScriptSubCommandLog=0
+
+#export mailFrom="${USER} <${USER}@${scriptHost}>"
+#export mailEnvelopeFrom="${USER}@${scriptHost}"
+#export mailRecipient="${USER}@${scriptHost}"
+#export mailSubject="Messages from ${scriptFile} running on ${scriptHost}"
+# }}}
+
+## Source inator library
+if ! source 'inator'; then
+    echo "!!! FATAL: Failed to source inator library" 1>&2
+    exit 2
+fi
+
+Boot ## Boot inator
+Dispatch "${@}" ## Dispatch the application with all original command line arguments
+
+## Application initialization function (command line argument parsing and validation etc.)
+function Init() { # {{{
+    # BEGIN YOUR OWN APPLICATION INITIALIZATION CODE HERE
+
+    # Parse command line options
+    while getopts ':ab:q' opt; do
+	case "${opt}" in
+	    a) # option a
+		declare -i A=1 ;;
+	    b) # option b
+		B="${OPTARG}" ;;
+	    q) # quiet operation
+		declare -i __MsgQuiet=1 ;;
+	    :) # option without a required argument
+		__die 2 "option -${OPTARG} requires an argument" # TODO FIXME: switch to __msg err ;;
+	    \?) # unknown option
+		__die 2 "unknown option -${OPTARG}" # TODO FIXME: switch to __msg err ;;
+	    *) # this should never happen
+		__die 2 "there's an error in the matrix!" # TODO FIXME: switch to __msg err ;;
+	esac
+	__msg debug "command line argument: -${opt}${OPTARG:+ '${OPTARG}'}"
+    done
+
+    # check if command line options were given at all
+    if [[ ${OPTIND} == 1 ]]; then
+	__die 2 "no command line option specified" # TODO FIXME: switch to __msg err
+    fi
+    # shift off options + arguments
+    let OPTIND--; shift ${OPTIND}; unset OPTIND
+    args="${@}"
+    set --
+
+    return 0 # success
+
+    ## -- END YOUR OWN APPLICATION INITIALIZATION CODE HERE --
+} # }}}
+
+## Application main function
+## =========================
+function Main() { # {{{
+    ## -- BEGIN YOUR OWN APPLICATION MAIN CODE HERE --
+
+    local i
+    for i in debug info notice warning err crit alert emerg; do
+	__msg ${i} "this is a ${i} test"
+    done
+
+    rm -v /does/not/exist >>"${_L}" 2>&1
+    mkdir -v /does/not/exist >>"${_L}" 2>&1
+    ls -v /does/not/exist >>"${_L}" 2>&1
+
+    exampleFunction "${ApplicationVariable1}" "${ApplicationVariable2}"
+
+    fooFunction fooArgs
+
+    return 0 # success
+
+    ## -- END YOUR OWN APPLICATION MAIN CODE HERE --
+} # }}}
+
+## Application worker functions
+## ============================
+
+function ExampleFunction() { # {{{
+    ## DESCRIPTION:
+    ##   this function does something
+    ##
+    ## ARGUMENTS:
+    ##   1: fooArgument (req): contains foo
+    ##   2: barArgument (opt): contains bar
+    ##
+    ## GLOBAL VARIABLES USED:
+    ##   /
+
+    local fooArgument="${1}"
+    if [[ -z "${fooArgument}" ]]; then
+	__msg err "argument 1 (fooArgument) missing"
+	return 2 # error
+    fi
+    __msg debug "fooArgument: ${fooArgument}"
+
+    local barArgument="${2}"
+    __msg debug "barArgument: ${barArgument}"
+
+    __msg info "this is an example function"
+
+    __msg info "PATH: ${PATH}"
+    __msg info "umask: $(umask)"
+
+    return 0 # success
+} # }}}
+
+function FooFunction() { # {{{
+    BarFunction barArgs
+} # }}}
+
+function BarFunction() { # {{{
+    BazFunction bazArgs
+} # }}}
+
+function BazFunction() { # {{{
+    Die 1 "Dying for test purposes"
+} # }}}
