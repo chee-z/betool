@@ -112,8 +112,8 @@ set whichwrap+=<,>,[,] " List of flags specifying which commands wrap to another
 set nostartofline " Many jump commands move the cursor to the first non-blank character of a line
 
 " List of directory names used for file searching (global or local to buffer)
-"if has("mac") || has("macunix")
-"elseif has("unix")
+"if has('mac') || has('macunix')
+"elseif has('unix')
 "    set path+=/usr/local/include
 "endif
 
