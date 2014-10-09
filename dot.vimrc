@@ -66,7 +66,7 @@ set hlsearch " Highlight all matches for the last used search pattern
 set ignorecase " Ignore case when using a search pattern
 set smartcase " Override 'ignorecase' when pattern has upper case characters
 set incsearch " Show match for partly typed search command
-set nowrapscan " Search commands do not wrap around the end of the buffer
+set wrapscan " Search commands wrap around the end of the buffer
 map <Leader><F9> :nohlsearch<CR>
 
 let g:is_posix = 1 " Vim's default is archaic bourne shell, bring it up to the 90s
@@ -138,7 +138,9 @@ set cinwords=if,else,while,do,for,switch,case " List of words that cause more C-
 syntax on " Enable syntax
 "set synmaxcol=256 " Maximum column to look for syntax items
 
-set mouse=a " Enable mouse
+if has('mouse')
+    set mouse=a " Enable mouse
+endif
 set mousehide " Hide the mouse pointer while typing
 set selectmode=mouse,key " 'mouse', 'key' and/or 'cmd'; when to start Select mode instead of Visual mode
 
@@ -178,12 +180,12 @@ set statusline=%<\ *No.%n*\ %f\ [%{&ff}]%y%m%r\ %{fugitive#statusline()}%=\ <Val
 set fillchars=stl:\ ,stlnc:*,vert:\|,fold:-,diff:- " Characters to use for the status line, folds and filler lines
 
 set foldenable " Set to display all folds open (local to window)
-set foldmethod=marker " Folding type: "manual", "indent", "expr", "marker" or "syntax"
+set foldmethod=syntax " Folding type: "manual", "indent", "expr", "marker" or "syntax"
 " Folds with a level higher than this number will be closed (local to window)
-set foldlevel=100 " Do not auto fold anything (but I can still fold manual)
+"set foldlevel=100 " Do not auto fold anything (but I can still fold manual)
+set foldlevelstart=20 " Value for 'foldlevel' when starting to edit a file
 set foldopen=block,hor,tag,percent,mark,quickfix " Specifies for which commands a fold will be opened
-"set foldlevelstart= " Value for 'foldlevel' when starting to edit a file
-set foldcolumn=2 " Width of the column used to indicate folds (local to window)
+set foldcolumn=1 " Width of the column used to indicate folds (local to window)
 
 set virtualedit=block " When to use virtual editing: "block", "insert" and/or "all"
 
@@ -297,6 +299,8 @@ nnoremap <C-J> gEa<CR><ESC>ew
 " au BufRead,BufNewFile {*.scala} setl ft=scala
 " au! BufReadPost       {COMMIT_EDITMSG,*/COMMIT_EDITMSG} setl ft=gitcommit noml list norm 1G
 " au! BufWritePost      {*.snippet,*.snippets} call ReloadAllSnippets()
+au FileType make setl noexpandtab
+autocmd FileType mkd setl sw=4 sts=4
 
 " open help in vertical split
 " au BufWinEnter *.txt if &ft == 'help' | wincmd H | nmap q :q<CR> | endif
@@ -318,9 +322,20 @@ call vundle#begin()
 
 Plugin 'gmarik/Vundle.vim' " Let Vundle manage itself
 Plugin 'altercation/vim-colors-solarized' " Colorscheme
-"Plugin 'tpope/vim-git'
-Plugin 'tpope/vim-fugitive' " Git plugin
 "Plugin 'L9' " Plugin from http://vim-scripts.org/vim/scripts.html
+Plugin 'kien/ctrlp.vim'
+Plugin 'godlygeek/tabular'
+Plugin 'plasticboy/vim-markdown'
+Plugin 'greplace.vim'
+Plugin 'ervandew/supertab'
+Plugin 'nathanaelkane/vim-indent-guides'
+Plugin 'mhinz/vim-startify'
+Plugin 'elzr/vim-json'
+"Plugin 'xolox/vim-session'
+"Plugin 'tpope/vim-git'
+Plugin 'tpope/vim-fugitive'
+Plugin 'scrooloose/syntastic'
+"Plugin 'Valloric/YouCompleteMe'
 " Git plugin not hosted on GitHub
 "Plugin 'git://git.wincent.com/command-t.git'
 " git repos on your local machine (i.e. when working on your own plugin)
@@ -348,11 +363,11 @@ if &t_Co > 1 || has('gui_running')
 endif
 
 " Program used for the ':grep' command (global or local to buffer)
-if has('mac') || has('macunix')
-    set grepprg=ack\ -k
-else
-    set grepprg=ack-grep\ -k
-endif
+"if has('mac') || has('macunix')
+"    set grepprg=ack\ -k
+"else
+"    set grepprg=ack-grep\ -k
+"endif
 "" }}}
 
 " vim:fdm=marker:fdl=0:nowrap:ts=8:sts=4:sw=4:
