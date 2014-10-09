@@ -1,0 +1,28 @@
+[user]
+    name = zhengchi
+    email = zhengchi@cyou-inc.com
+[core]
+    #fileMode = false
+    fileMode = true
+    editor = vim
+[diff]
+    tool = vimdiff
+[difftool]
+    prompt = false
+[merge]
+    tool = vimdiff
+[mergetool]
+    prompt = false
+[color]
+    branch = auto
+    diff = auto
+    interactive = auto
+    pager = true
+    showbranch = auto
+    status = auto
+    ui = auto
+[alias]
+    logm = log --oneline --graph --decorate
+[pack]
+    #windowMemory = 1024m
+    #threads = 1
