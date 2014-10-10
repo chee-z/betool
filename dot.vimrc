@@ -106,9 +106,9 @@ set showbreak=+++\  " String to put before wrapped screen lines
 
 set nowrap " Long lines wrap
 set textwidth=90 " Line length above which to break a line (local to buffer)
-set tabstop=2 " 2 spaces a <Tab> in the text stands for (local to buffer)
-set softtabstop=2 " 2 spaces to insert for a <Tab> (local to buffer)
-set shiftwidth=2 " 2 spaces used for each step of (auto)indent (local to buffer)
+set tabstop=4 " Number of spaces a <Tab> in the text stands for (local to buffer)
+set softtabstop=4 " Number of spaces to insert for a <Tab> (local to buffer)
+set shiftwidth=4 " Number of spaces used for each step of (auto)indent (local to buffer)
 set expandtab " Expand <Tab> to spaces with 'tabstop' in Insert mode (local to buffer)
 set smarttab " A <Tab> in an indent inserts 'shiftwidth' spaces
 
@@ -177,7 +177,7 @@ set shortmess=atI " List of flags to make messages shorter
 set showcmd " Show (partial) command keys in the status line
 " Alternate format to be used for a status line
 set statusline=%<\ *No.%n*\ %f\ [%{&ff}]%y%m%r\ %{fugitive#statusline()}%=\ <Val:0x%B>\ <L%l,C%c%V>\ <%P>\ 
-set fillchars=stl:\ ,stlnc:*,vert:\|,fold:-,diff:- " Characters to use for the status line, folds and filler lines
+set fillchars=stl:\ ,stlnc:-,vert:\|,fold:-,diff:- " Characters to use for the status line, folds and filler lines
 
 set foldenable " Set to display all folds open (local to window)
 set foldmethod=syntax " Folding type: "manual", "indent", "expr", "marker" or "syntax"
@@ -193,7 +193,7 @@ set splitbelow " A new window is put below the current one
 set splitright " A new window is put right of the current one
 
 set list " Show <Tab> as ^I and end-of-line as $ (local to window)
-set listchars=tab:\ .,eol:¬,trail:·,extends:»,precedes:« " List of strings used for list mode
+set listchars=tab:▶▷,eol:▼,trail:▫,extends:»,precedes:« " List of strings used for list mode
 
 " List of flags that specify how the GUI works
 if has('gui_running')
@@ -292,15 +292,14 @@ nnoremap <C-J> gEa<CR><ESC>ew
 
 "" AutoCommands {{{
 "" ================
-" au BufRead,BufNewFile {*.go} setl ft=go tabstop=2 softtabstop=2 noexpandtab smarttab " autocmd FileType go compiler go
-" au BufRead,BufNewFile {Gemfile,Rakefile,Capfile,*.rake,config.ru} setl ft=ruby tabstop=2 softtabstop=2 shiftwidth=2 expandtab smarttab
+" au BufRead,BufNewFile {*.go} setl ft=go noexpandtab " autocmd FileType go compiler go
+" au BufRead,BufNewFile {Gemfile,Rakefile,Capfile,*.rake,config.ru} setl ft=ruby
 " au BufRead,BufNewFile {*.local} setl ft=sh
 " au BufRead,BufNewFile {*.md,*.mkd,*.markdown} setl ft=markdown
 " au BufRead,BufNewFile {*.scala} setl ft=scala
 " au! BufReadPost       {COMMIT_EDITMSG,*/COMMIT_EDITMSG} setl ft=gitcommit noml list norm 1G
 " au! BufWritePost      {*.snippet,*.snippets} call ReloadAllSnippets()
 au FileType make setl noexpandtab
-autocmd FileType mkd setl sw=4 sts=4
 
 " open help in vertical split
 " au BufWinEnter *.txt if &ft == 'help' | wincmd H | nmap q :q<CR> | endif
@@ -321,6 +320,7 @@ call vundle#begin()
 "call vundle#begin('~/some/path/here')
 
 Plugin 'gmarik/Vundle.vim' " Let Vundle manage itself
+Plugin 'mhinz/vim-startify'
 Plugin 'altercation/vim-colors-solarized' " Colorscheme
 "Plugin 'L9' " Plugin from http://vim-scripts.org/vim/scripts.html
 Plugin 'kien/ctrlp.vim'
@@ -329,7 +329,6 @@ Plugin 'plasticboy/vim-markdown'
 Plugin 'greplace.vim'
 Plugin 'ervandew/supertab'
 Plugin 'nathanaelkane/vim-indent-guides'
-Plugin 'mhinz/vim-startify'
 Plugin 'elzr/vim-json'
 "Plugin 'xolox/vim-session'
 "Plugin 'tpope/vim-git'
@@ -370,4 +369,4 @@ endif
 "endif
 "" }}}
 
-" vim:fdm=marker:fdl=0:nowrap:ts=8:sts=4:sw=4:
+" vim:fdm=marker:nowrap:
